@@ -11,6 +11,20 @@
 #  - PROD_SSH_KEY / PROD_HOST / PROD_USER (for the tag-triggered deploy)
 #  - DOCKERHUB_USERNAME / DOCKERHUB_TOKEN (to push the image)
 #  - SLACK_WEBHOOK (for deploy notifications)
+#
+# NOTE (fix, 2026-08-29):
+#  - backend keeps cloudinary@^2.x. multer-storage-cloudinary@^4.0.0 only
+#    declares a peer dep on cloudinary@^1.x, so the backend `npm ci` step
+#    below uses --legacy-peer-deps to skip that peer-dependency check.
+#    Since multer-storage-cloudinary isn't verified against the v2 SDK,
+#    test any Cloudinary upload flows carefully — if uploads break, the
+#    fix is to replace multer-storage-cloudinary with a small custom
+#    multer storage engine built on cloudinary.v2.uploader.upload_stream.
+#  - test-backend and test-frontend-a11y bumped to Node 22 (chromedriver@152
+#    requires it).
+#  - test-frontend-a11y now runs `browser-driver-manager install chrome`
+#    before axe, and passes --chromedriver-path explicitly, so ChromeDriver
+#    stays in sync with whatever Chrome ships on the runner.
 
 name: CI
 
@@ -54,12 +68,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
           cache-dependency-path: backend/package-lock.json
       - working-directory: backend
         run: |
-          npm ci --no-audit --no-fund
+          # --legacy-peer-deps: multer-storage-cloudinary@^4.0.0 peer-deps on
+          # cloudinary@^1.x but we're intentionally on cloudinary@^2.x.
+          npm ci --no-audit --no-fund --legacy-peer-deps
           # QD-001 guard — fails the build if any model fails to compile.
           npm run models:compile
           # Full test suite (QD-001 regression guard, QD-002/007 XSS,
@@ -79,7 +95,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
       - working-directory: frontend
@@ -93,10 +109,12 @@ jobs:
           # This is a minimal a11y gate — full e2e a11y testing would
           # use Playwright + axe but that's beyond the scope of this fix.
           npm install --no-save @axe-core/cli http-server
+          npx browser-driver-manager install chrome
           npx http-server dist -p 4173 &
           SERVER_PID=$!
           sleep 2
-          npx axe http://localhost:4173 --exit
+          npx axe http://localhost:4173 --exit \
+            --chromedriver-path "$(npx browser-driver-manager which chromedriver)"
           kill $SERVER_PID
 
   # ---- Build the Docker image ----------------------------------------------
