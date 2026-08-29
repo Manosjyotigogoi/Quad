@@ -14,17 +14,20 @@
 #
 # NOTE (fix, 2026-08-29):
 #  - backend keeps cloudinary@^2.x. multer-storage-cloudinary@^4.0.0 only
-#    declares a peer dep on cloudinary@^1.x, so the backend `npm ci` step
-#    below uses --legacy-peer-deps to skip that peer-dependency check.
-#    Since multer-storage-cloudinary isn't verified against the v2 SDK,
-#    test any Cloudinary upload flows carefully — if uploads break, the
-#    fix is to replace multer-storage-cloudinary with a small custom
-#    multer storage engine built on cloudinary.v2.uploader.upload_stream.
+#    declares a peer dep on cloudinary@^1.x, so every backend `npm ci` step
+#    below (lint + test-backend) uses --legacy-peer-deps to skip that
+#    peer-dependency check. Since multer-storage-cloudinary isn't verified
+#    against the v2 SDK, test any Cloudinary upload flows carefully — if
+#    uploads break, the fix is to replace multer-storage-cloudinary with a
+#    small custom multer storage engine built on
+#    cloudinary.v2.uploader.upload_stream.
 #  - test-backend and test-frontend-a11y bumped to Node 22 (chromedriver@152
 #    requires it).
-#  - test-frontend-a11y now runs `browser-driver-manager install chrome`
-#    before axe, and passes --chromedriver-path explicitly, so ChromeDriver
-#    stays in sync with whatever Chrome ships on the runner.
+#  - test-frontend-a11y runs `browser-driver-manager install chrome` in its
+#    own step (it writes CHROMEDRIVER_TEST_PATH etc. into $GITHUB_ENV, which
+#    only takes effect in later steps of the same job — not the same step).
+#    The axe step then reads $CHROMEDRIVER_TEST_PATH directly; there is no
+#    `browser-driver-manager which` subcommand, so don't try to capture one.
 
 name: CI
 
@@ -44,7 +47,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
           cache-dependency-path: |
             backend/package-lock.json
@@ -52,7 +55,7 @@ jobs:
       - name: Lint backend
         working-directory: backend
         run: |
-          npm ci --no-audit --no-fund
+          npm ci --no-audit --no-fund --legacy-peer-deps
           npx eslint . --ext .js || true  # QD-023 (a11y) etc — non-blocking
       - name: Lint frontend
         working-directory: frontend
@@ -102,19 +105,24 @@ jobs:
         run: |
           npm ci --no-audit --no-fund
           npm run build
+      - name: Sync Chrome + ChromeDriver
+        run: npx browser-driver-manager install chrome
       - name: Run axe-core against built pages
         working-directory: frontend
         run: |
           # Install axe-core + a static-server, then walk the built pages.
           # This is a minimal a11y gate — full e2e a11y testing would
           # use Playwright + axe but that's beyond the scope of this fix.
+          #
+          # CHROMEDRIVER_TEST_PATH is set into $GITHUB_ENV by the
+          # "Sync Chrome + ChromeDriver" step above — browser-driver-manager
+          # has no `which` subcommand, so don't try to capture one via $().
           npm install --no-save @axe-core/cli http-server
-          npx browser-driver-manager install chrome
           npx http-server dist -p 4173 &
           SERVER_PID=$!
           sleep 2
           npx axe http://localhost:4173 --exit \
-            --chromedriver-path "$(npx browser-driver-manager which chromedriver)"
+            --chromedriver-path "$CHROMEDRIVER_TEST_PATH"
           kill $SERVER_PID
 
   # ---- Build the Docker image ----------------------------------------------
