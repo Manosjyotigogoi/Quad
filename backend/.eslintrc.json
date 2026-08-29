@@ -1,0 +1,14 @@
+{
+  "root": true,
+  "env": { "es2022": true, "node": true },
+  "parserOptions": { "ecmaVersion": 2022, "sourceType": "module" },
+  "extends": ["eslint:recommended"],
+  "rules": {
+    "no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
+    "no-console": "off",
+    "semi": ["error", "always"],
+    "quotes": ["error", "single"],
+    "indent": ["error", 2, { "SwitchCase": 1 }]
+  },
+  "ignorePatterns": ["node_modules/", "dist/", "coverage/"]
+}

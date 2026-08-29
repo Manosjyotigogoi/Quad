@@ -1,0 +1,7 @@
+# QD-022 — robots.txt
+# Allow all crawlers full access (we want listings indexed).
+User-agent: *
+Allow: /
+
+# Sitemap location (update the domain before deploying).
+Sitemap: https://your-domain/sitemap.xml

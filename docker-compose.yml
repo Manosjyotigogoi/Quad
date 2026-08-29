@@ -1,0 +1,80 @@
+# QD-020 — Local-development docker-compose for parity with production.
+#
+# Spins up:
+#  - quad-mongo   (MongoDB 7, persistent volume)
+#  - quad-redis   (Redis 7, for rate-limit-redis + BullMQ email queue)
+#  - quad-backend (Node + Express, mounts the source for hot reload)
+#  - quad-frontend (Vite dev server with HMR)
+#
+# Run: docker compose up
+# Tear down + delete volumes: docker compose down -v
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: quad
+      MONGO_INITDB_ROOT_PASSWORD: quaddevpassword
+    ports:
+      - "27017:27017"
+    volumes:
+      - quad-mongo-dev:/data/db
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - quad-redis-dev:/data
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # Override the production CMD with nodemon for dev hot-reload.
+    # We need to install dev deps for nodemon to work.
+    command: ["npx", "nodemon", "server.js"]
+    working_dir: /app
+    depends_on:
+      - mongo
+      - redis
+    environment:
+      NODE_ENV: development
+      PORT: 5000
+      CLIENT_URL: http://localhost:5173
+      MONGO_URI: mongodb://quad:quaddevpassword@mongo:27017/quad?authSource=admin
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: dev-secret-not-for-prod
+      JWT_EXPIRES_IN: 30d
+      COOKIE_MAX_AGE_MS: 2592000000
+      # QD-014 — must be a real college domain, not a public provider.
+      COLLEGE_EMAIL_DOMAIN: example.edu
+      LOG_LEVEL: debug
+    ports:
+      - "5000:5000"
+    volumes:
+      # Mount the source so nodemon can hot-reload.
+      - ./backend:/app
+      # Don't overwrite the production node_modules we baked in.
+      - /app/node_modules
+
+  frontend:
+    image: node:20-alpine
+    working_dir: /app
+    command: ["sh", "-c", "npm install && npm run dev -- --host 0.0.0.0"]
+    depends_on:
+      - backend
+    environment:
+      VITE_API_URL: http://localhost:5000/api
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - quad-frontend-node-modules:/app/node_modules
+
+volumes:
+  quad-mongo-dev:
+  quad-redis-dev:
+  quad-frontend-node-modules:

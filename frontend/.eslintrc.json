@@ -1,0 +1,17 @@
+{
+  "root": true,
+  "env": { "browser": true, "es2022": true },
+  "parserOptions": { "ecmaVersion": 2022, "sourceType": "module", "ecmaFeatures": { "jsx": true } },
+  "parser": "@babel/eslint-parser",
+  "extends": ["eslint:recommended", "plugin:react/recommended", "plugin:react-hooks/recommended"],
+  "plugins": ["react", "react-refresh"],
+  "settings": { "react": { "version": "detect" } },
+  "rules": {
+    "react/prop-types": "off",
+    "react/react-in-jsx-scope": "off",
+    "no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
+    "semi": ["error", "always"],
+    "quotes": ["error", "single"]
+  },
+  "ignorePatterns": ["node_modules/", "dist/"]
+}
