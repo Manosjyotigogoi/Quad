@@ -14,7 +14,6 @@
 # falls back to inline send. For staging / low traffic this is fine.
 # For production, set up a free Upstash Redis instance and put its
 # URL in REDIS_URL.
-
 services:
   - type: web
     name: quad-backend
@@ -30,8 +29,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        renderProperty: port
+      # PORT is injected automatically by Render at runtime — no envVar
+      # entry needed here (renderProperty isn't valid on a plain envVar).
       # Required — set these in the Render dashboard (or via `render env set`):
       - key: MONGO_URI
         sync: false
