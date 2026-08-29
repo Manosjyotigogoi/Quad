@@ -1,0 +1,71 @@
+# Render Blueprint — deploys the Quad backend to Render.
+#
+# Usage: in the Render dashboard, click "New +" → "Blueprint" →
+# connect your GitHub repo → Render reads this file and creates the
+# service for you. Set the env vars in the Render dashboard (see
+# DEPLOYMENT.md for the full list).
+#
+# Free tier compatible: the backend alone fits in the free 512 MB / 0.1 CPU.
+# You'll need an EXTERNAL MongoDB Atlas cluster (Render doesn't host
+# Mongo for free) — see DEPLOYMENT.md for setup.
+#
+# Redis is OPTIONAL — if not set, the rate limiter falls back to
+# in-memory (per-instance, resets on restart) and the email queue
+# falls back to inline send. For staging / low traffic this is fine.
+# For production, set up a free Upstash Redis instance and put its
+# URL in REDIS_URL.
+
+services:
+  - type: web
+    name: quad-backend
+    runtime: node
+    plan: free
+    region: oregon
+    branch: main
+    rootDir: backend
+    buildCommand: npm install --legacy-peer-deps --no-audit --no-fund
+    startCommand: node server.js
+    healthCheckPath: /api/ready
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        renderProperty: port
+      # Required — set these in the Render dashboard (or via `render env set`):
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: COLLEGE_EMAIL_DOMAIN
+        sync: false
+      - key: CLIENT_URL
+        sync: false  # set to your Vercel frontend URL after deploy
+      - key: SERVER_URL
+        sync: false  # set to your Render backend URL
+      - key: ADMIN_EMAIL
+        sync: false
+      # Optional — without these, OTPs print to logs and uploads fail gracefully
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      # Optional — wire to a Redis instance (Upstash free tier) for
+      # shared rate-limit + email queue across multiple instances
+      - key: REDIS_URL
+        sync: false
+      # Optional — protects /metrics endpoint in production
+      - key: METRICS_TOKEN
+        sync: false
