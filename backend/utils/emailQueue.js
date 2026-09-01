@@ -33,7 +33,8 @@ function getTransporter() {
     secure: Number(process.env.SMTP_PORT) === 465,
     auth: process.env.SMTP_USER
       ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
-      : undefined
+      : undefined,
+    family: 4 // force IPv4 to avoid IPv6 DNS issues in some environments
   });
   return transporter;
 }
